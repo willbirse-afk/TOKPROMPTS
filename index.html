@@ -1,21 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOK Prompt Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208;
+    --parchment: #f5f0e8;
+    --gold: #c9973a;
+    --gold-light: #e8c97a;
+    --rust: #8b3a2a;
+    --cream: #faf7f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Libre Baskerville', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.6;
+  }
+  .page { display: none; min-height: 100vh; animation: fadeIn 0.6s ease forwards; }
+  .page.active { display: flex; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  #landing {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    text-align: center;
+    position: relative;
+  }
+  .corner-deco {
+    position: absolute;
+    width: 90px; height: 90px;
+    border-color: var(--gold);
+    border-style: solid;
+    opacity: 0.5;
+  }
+  .corner-deco.tl { top: 28px; left: 28px; border-width: 2px 0 0 2px; }
+  .corner-deco.tr { top: 28px; right: 28px; border-width: 2px 2px 0 0; }
+  .corner-deco.bl { bottom: 28px; left: 28px; border-width: 0 0 2px 2px; }
+  .corner-deco.br { bottom: 28px; right: 28px; border-width: 0 2px 2px 0; }
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(38px, 8vw, 68px);
+    line-height: 1.08;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  h1 em { color: var(--gold); font-style: italic; }
+  .subtitle {
+    font-family: 'Libre Baskerville', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: #6b5a44;
+    max-width: 480px;
+    line-height: 1.7;
+    margin: 18px auto 44px;
+  }
+  .divider { width: 60px; height: 1px; background: var(--gold); margin: 0 auto 44px; }
+  .start-btn {
+    background: var(--ink);
+    color: var(--parchment);
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 16px 44px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.25s;
+  }
+  .start-btn:hover { background: var(--rust); }
+  .prompts-preview {
+    margin-top: 64px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 700px;
+    width: 100%;
+  }
+  .preview-card {
+    background: white;
+    border: 1px solid #e8e0d0;
+    padding: 14px 16px;
+    text-align: left;
+    box-shadow: 2px 3px 0 #e0d5c0;
+  }
+  .preview-card .num { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--gold); letter-spacing: 0.15em; margin-bottom: 6px; }
+  .preview-card p { font-size: 11px; line-height: 1.5; color: #5a4a38; }
+  @media (max-width: 600px) { .prompts-preview { grid-template-columns: repeat(2, 1fr); } }
 
+  #quiz { flex-direction: column; align-items: center; padding: 48px 20px 80px; }
+  .quiz-header {
+    width: 100%; max-width: 680px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 48px;
+  }
+  .logo-small { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--ink); }
+  .logo-small em { color: var(--gold); font-style: italic; }
+  .progress-wrap { display: flex; align-items: center; gap: 10px; }
+  .progress-label { font-family: 'DM Mono', monospace; font-size: 11px; color: #9a8a72; letter-spacing: 0.1em; }
+  .progress-bar { width: 120px; height: 3px; background: #e0d5c0; position: relative; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--gold); transition: width 0.5s ease; }
+  .question-card {
+    background: white;
+    border: 1px solid #e0d5c0;
+    box-shadow: 4px 6px 0 #ddd3be, 8px 12px 0 #e8e0d0;
+    padding: 52px 52px 44px;
+    max-width: 680px; width: 100%;
+  }
+  @media (max-width: 600px) { .question-card { padding: 32px 24px 28px; } }
+  .q-number { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; margin-bottom: 18px; }
+  .q-text { font-family: 'Playfair Display', serif; font-size: clamp(18px, 3.5vw, 24px); line-height: 1.45; color: var(--ink); margin-bottom: 36px; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option-btn {
+    background: var(--parchment);
+    border: 1px solid #d8cdb8;
+    padding: 14px 20px;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Libre Baskerville', serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #4a3a28;
+    transition: all 0.2s;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .option-btn .opt-letter { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--gold); letter-spacing: 0.1em; flex-shrink: 0; margin-top: 2px; }
+  .option-btn:hover { background: var(--ink); color: var(--parchment); border-color: var(--ink); transform: translateX(4px); }
+  .option-btn:hover .opt-letter { color: var(--gold-light); }
+  .option-btn.selected { background: var(--ink); color: var(--parchment); border-color: var(--gold); }
+  .option-btn.selected .opt-letter { color: var(--gold-light); }
 
+  #result { flex-direction: column; align-items: center; padding: 60px 24px 100px; text-align: center; }
+  .result-eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 16px; }
+  .result-title { font-family: 'Playfair Display', serif; font-size: clamp(28px, 6vw, 48px); line-height: 1.1; color: var(--ink); margin-bottom: 8px; }
+  .result-subtitle { font-family: 'Libre Baskerville', serif; font-style: italic; color: #8a7560; font-size: 16px; margin-bottom: 48px; }
+  .prompt-result-card {
+    background: white; border: 1px solid #d8cdb8;
+    box-shadow: 6px 8px 0 #d8cdb8;
+    padding: 44px 48px; max-width: 700px; width: 100%;
+    text-align: left; margin-bottom: 32px; position: relative;
+  }
+  .prompt-result-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--gold); }
+  .prompt-num { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; margin-bottom: 16px; }
+  .prompt-text { font-family: 'Playfair Display', serif; font-size: clamp(16px, 2.5vw, 21px); line-height: 1.55; color: var(--ink); margin-bottom: 28px; }
+  .why-section { border-top: 1px solid #e8e0d0; padding-top: 24px; }
+  .why-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+  .why-text { font-size: 14px; line-height: 1.8; color: #5a4a38; }
+  .aok-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .aok-tag { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; border: 1px solid var(--gold); color: var(--gold); padding: 4px 10px; }
+  .runner-ups { max-width: 700px; width: 100%; margin-bottom: 36px; }
+  .runner-ups h3 { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #9a8a72; margin-bottom: 16px; text-align: left; }
+  .runner-list { display: flex; flex-direction: column; gap: 8px; }
+  .runner-item { background: var(--parchment); border: 1px solid #e0d5c0; padding: 12px 16px; text-align: left; display: flex; align-items: center; gap: 14px; transition: all 0.2s; }
+  .runner-item:hover { border-color: var(--gold); transform: translateX(4px); }
+  .runner-item .r-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--gold); flex-shrink: 0; }
+  .runner-item .r-text { font-size: 13px; color: #5a4a38; line-height: 1.4; }
+  .restart-btn { background: transparent; border: 1px solid var(--ink); color: var(--ink); font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; padding: 14px 36px; cursor: pointer; transition: all 0.25s; }
+  .restart-btn:hover { background: var(--ink); color: var(--parchment); }
+  .scores-visual { max-width: 700px; width: 100%; margin-bottom: 40px; }
+  .scores-visual h3 { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #9a8a72; margin-bottom: 16px; text-align: left; }
+  .score-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .score-label { font-family: 'DM Mono', monospace; font-size: 10px; color: #6b5a44; width: 24px; text-align: right; }
+  .score-track { flex: 1; height: 6px; background: #e8e0d0; position: relative; overflow: hidden; }
+  .score-bar { height: 100%; background: var(--gold); transition: width 1s ease 0.3s; }
+  .score-val { font-family: 'DM Mono', monospace; font-size: 10px; color: #9a8a72; width: 20px; }
+</style>
+</head>
+<body>
 
+<div id="landing" class="page active">
+  <div class="corner-deco tl"></div>
+  <div class="corner-deco tr"></div>
+  <div class="corner-deco bl"></div>
+  <div class="corner-deco br"></div>
+  <p class="eyebrow">IB Theory of Knowledge · 2024–2025</p>
+  <h1>Find Your<br><em>Ideal</em> Prompt</h1>
+  <div class="divider"></div>
+  <p class="subtitle">Answer eight questions about how you think, what excites you, and how you write — and we'll match you to the TOK essay prompt where you'll do your best work.</p>
+  <button class="start-btn" id="start-btn">Begin the quiz →</button>
+  <div class="prompts-preview">
+    <div class="preview-card"><div class="num">Prompt 01</div><p>Is the advice to "study the historian before you study their work" good advice?</p></div>
+    <div class="preview-card"><div class="num">Prompt 02</div><p>Is failure an essential part of the production of knowledge?</p></div>
+    <div class="preview-card"><div class="num">Prompt 03</div><p>Why are ideas more alluring than facts in the production of knowledge?</p></div>
+    <div class="preview-card"><div class="num">Prompt 04</div><p>Should the artist and scientist be equally concerned with ethical questions?</p></div>
+    <div class="preview-card"><div class="num">Prompt 05</div><p>Does sharing knowledge pose challenges in producing it?</p></div>
+    <div class="preview-card"><div class="num">Prompt 06</div><p>How is intuition so valuable in knowledge, given it lacks evidence?</p></div>
+  </div>
+</div>
 
-IB THEORY OF KNOWLEDGE · 2024–2025
-Find Your Ideal Prompt
+<div id="quiz" class="page">
+  <div class="quiz-header">
+    <div class="logo-small">TOK <em>Finder</em></div>
+    <div class="progress-wrap">
+      <span class="progress-label" id="prog-label">1 / 8</span>
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:12.5%"></div></div>
+    </div>
+  </div>
+  <div class="question-card">
+    <div class="q-number" id="q-num">Question 01</div>
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="q-options"></div>
+  </div>
+</div>
 
-Answer eight questions about how you think, what excites you, and how you write — and we'll match you to the TOK essay prompt where you'll do your best work.
-BEGIN THE QUIZ →
-Prompt 01
-Is the advice to "study the historian before you study their work" good advice?
-Prompt 02
-Is failure an essential part of the production of knowledge?
-Prompt 03
-Why are ideas more alluring than facts in the production of knowledge?
-Prompt 04
-Should the artist and scientist be equally concerned with ethical questions?
-Prompt 05
-Does sharing knowledge pose challenges in producing it?
-Prompt 06
-How is intuition so valuable in knowledge, given it lacks evidence?
+<div id="result" class="page">
+  <p class="result-eyebrow">Your match is in</p>
+  <h2 class="result-title">Your Ideal Prompt</h2>
+  <p class="result-subtitle" id="result-tagline"></p>
+  <div class="prompt-result-card" id="result-card">
+    <div class="prompt-num" id="res-num"></div>
+    <div class="prompt-text" id="res-text"></div>
+    <div class="why-section">
+      <div class="why-label">Why this is your prompt</div>
+      <div class="why-text" id="res-why"></div>
+      <div class="aok-tags" id="res-tags"></div>
+    </div>
+  </div>
+  <div class="scores-visual">
+    <h3>Your alignment scores</h3>
+    <div id="scores-bars"></div>
+  </div>
+  <div class="runner-ups">
+    <h3>Runner-up prompts</h3>
+    <div class="runner-list" id="runner-list"></div>
+  </div>
+  <button class="restart-btn" id="restart-btn">← Retake the quiz</button>
+</div>
+
+<script>
+const PROMPTS = [
+  {
+    id: 1,
+    short: "Prompt 01 — The Historian",
+    full: "Is the advice to study the historian before you begin to study their work (adapted from E.H. Carr) good advice? Explore with reference to history and one other area of knowledge.",
+    aok: ["History", "+ 1 other AOK of your choice"],
+    tagline: "You're a critical thinker drawn to perspective, bias, and the human behind the knowledge.",
+    why: "You scored highest on interest in subjectivity, bias, and the role of personal context in shaping what we know. This prompt lets you interrogate whether all knowledge claims must be filtered through their author — a rich meta-question. You'll thrive pairing History with another AOK where the knower's identity really matters (like the Human Sciences or the Arts)."
+  },
+  {
+    id: 2,
+    short: "Prompt 02 — Failure & Knowledge",
+    full: "To what extent do you agree that failure is an essential part of the production of knowledge? Answer with reference to two areas of knowledge.",
+    aok: ["Any two AOKs"],
+    tagline: "You're energised by process, iteration, and the messy reality of how we actually learn.",
+    why: "Your responses show a fascination with how knowledge is built over time — the false starts, the pivots, the trial and error. This prompt gives you total freedom to choose your two AOKs and lets you take a genuine stance. Whether you argue failure is essential or merely useful, there's room for a sophisticated, personal argument here."
+  },
+  {
+    id: 3,
+    short: "Prompt 03 — Ideas vs. Facts",
+    full: "In the production of knowledge, why is it that ideas are so often more alluring than facts? Discuss with reference to the human sciences and one other area of knowledge.",
+    aok: ["Human Sciences", "+ 1 other AOK"],
+    tagline: "You're captivated by psychology, culture, and why humans believe what they believe.",
+    why: "You're drawn to questions about human motivation and cognition — why we're seduced by narratives, theories, and elegant explanations even when the data says otherwise. The Human Sciences anchor is a natural fit. This is a genuinely interesting philosophical question you can attack from psychology, sociology, or economics alongside history, the arts, or natural science."
+  },
+  {
+    id: 4,
+    short: "Prompt 04 — Ethics in Arts & Science",
+    full: "To what extent do you agree that the artist and the natural scientist should be equally concerned with ethical questions? Discuss with reference to the arts and the natural sciences.",
+    aok: ["The Arts", "Natural Sciences"],
+    tagline: "You're passionate about ethics, responsibility, and where creativity meets consequence.",
+    why: "Your responses reveal strong ethical intuitions and an interest in where domains of knowledge carry moral weight. This prompt has a clear, arguable thesis built in — 'equally' is doing a lot of work — and rewards nuanced comparison. If you love both science and the arts, or feel strongly that one carries more ethical responsibility than the other, this is your prompt."
+  },
+  {
+    id: 5,
+    short: "Prompt 05 — Sharing Knowledge",
+    full: "Does the need to share knowledge pose challenges in the production of knowledge? Discuss with reference to two areas of knowledge.",
+    aok: ["Any two AOKs"],
+    tagline: "You're interested in communication, community, and the social life of knowledge.",
+    why: "You think about knowledge as something that lives between people — shaped by audiences, institutions, and the friction of transmission. This prompt rewards students who want to explore peer review, academic gatekeeping, the replication crisis, or how artistic knowledge is transformed when shared. The flexible AOK choice means you can write about what you genuinely know."
+  },
+  {
+    id: 6,
+    short: "Prompt 06 — Intuition",
+    full: "Given that it lacks evidence, how is it that intuition is so valuable in the production of knowledge? Discuss with reference to mathematics and one other area of knowledge.",
+    aok: ["Mathematics", "+ 1 other AOK"],
+    tagline: "You're drawn to the mysterious, the inexplicable, and the role of gut feeling in discovery.",
+    why: "You're curious about the parts of knowledge-making that resist full explanation — the flash of insight, the hunch that turns out to be right, the mathematician's aesthetic sense that a proof should work. This prompt is philosophically rich and lets you explore intuition in Maths alongside the Natural Sciences, Arts, or even History of great discoveries."
+  }
+];
+
+const QUESTIONS = [
+  {
+    text: "When you encounter a new idea, what's your first instinct?",
+    options: [
+      { text: "Ask: who came up with this, and why should I trust them?", scores: [3,0,1,0,0,0] },
+      { text: "Ask: how was this discovered — what trial and error was involved?", scores: [0,3,0,0,1,0] },
+      { text: "Ask: why does this idea feel so compelling compared to the raw data?", scores: [0,0,3,1,0,0] },
+      { text: "Ask: what are the moral implications of believing or acting on this?", scores: [0,0,0,3,1,0] }
+    ]
+  },
+  {
+    text: "Which subject do you find most genuinely fascinating?",
+    options: [
+      { text: "History — the drama of how the past was constructed and contested", scores: [3,0,0,0,0,1] },
+      { text: "Science — the long, imperfect process of building reliable knowledge", scores: [0,2,0,2,0,1] },
+      { text: "Psychology or Sociology — why people and societies think and behave as they do", scores: [1,0,3,0,1,0] },
+      { text: "Philosophy or Ethics — the deep questions about right, wrong, and reality", scores: [1,1,0,2,0,2] }
+    ]
+  },
+  {
+    text: "Pick the essay structure that appeals most to you:",
+    options: [
+      { text: "A lens essay — examining one central question through paired case studies", scores: [2,0,1,2,0,1] },
+      { text: "A process essay — tracing how something develops or changes over time", scores: [0,3,0,0,2,0] },
+      { text: "A compare-and-contrast essay — holding two things up side by side", scores: [0,0,1,2,1,1] },
+      { text: "An argument essay — taking a clear position and defending it rigorously", scores: [1,2,2,1,0,2] }
+    ]
+  },
+  {
+    text: "Which of these claims feels most interesting to argue about?",
+    options: [
+      { text: "All knowledge is shaped by who produces it", scores: [3,0,1,0,0,0] },
+      { text: "Getting things wrong is necessary to eventually get them right", scores: [0,3,0,0,1,0] },
+      { text: "A beautiful theory will always beat an ugly pile of data", scores: [0,0,3,0,0,2] },
+      { text: "Scientists and artists both have a duty to consider what harm their work can do", scores: [0,0,0,3,0,0] }
+    ]
+  },
+  {
+    text: "What kind of real-world examples excite you most in a TOK essay?",
+    options: [
+      { text: "Historians who were products of their time — Churchill, Herodotus, Ranke", scores: [3,0,0,0,0,0] },
+      { text: "Scientific breakthroughs built on earlier failures — Fleming, Darwin, Einstein", scores: [0,3,0,1,0,1] },
+      { text: "Moments when a theory captured people despite thin evidence — Freud, Milgram", scores: [0,0,3,0,0,0] },
+      { text: "Ethical dilemmas in tech, medicine, or art — CRISPR, AI art, propaganda", scores: [0,0,0,3,1,0] }
+    ]
+  },
+  {
+    text: "When you think about knowledge being shared or spread, you're most interested in…",
+    options: [
+      { text: "How an author's identity colours how their work is received", scores: [2,0,0,0,1,0] },
+      { text: "How peer review and publication shape what counts as scientific knowledge", scores: [0,1,0,0,3,0] },
+      { text: "How social media and culture make some ideas go viral over others", scores: [0,0,2,0,2,0] },
+      { text: "How mathematicians and artists communicate insights that feel almost ineffable", scores: [0,0,0,0,1,3] }
+    ]
+  },
+  {
+    text: "Your honest relationship with maths is…",
+    options: [
+      { text: "I love it — there's something almost magical about proof and abstraction", scores: [0,0,0,0,0,3] },
+      { text: "I appreciate it — it's the clearest example of humans building reliable knowledge", scores: [0,2,0,1,1,1] },
+      { text: "It's a tool — I'm more drawn to how people and societies work", scores: [0,0,3,0,1,0] },
+      { text: "I prefer the humanities — meaning, interpretation, and ethical weight", scores: [2,1,1,2,0,0] }
+    ]
+  },
+  {
+    text: "When you write an essay, you find it easiest to…",
+    options: [
+      { text: "Unpack someone's assumptions and show how their context shaped their claims", scores: [3,0,1,0,0,0] },
+      { text: "Narrate a story of discovery with twists, mistakes, and eventual insight", scores: [0,3,0,0,1,0] },
+      { text: "Build a logical argument that leads clearly to a conclusion", scores: [0,1,0,1,0,3] },
+      { text: "Weigh competing perspectives and arrive at a nuanced, balanced judgment", scores: [1,0,2,2,2,0] }
+    ]
+  }
+];
+
+let currentQ = 0;
+let scores = [0,0,0,0,0,0];
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('start-btn').addEventListener('click', startQuiz);
+  document.getElementById('restart-btn').addEventListener('click', restart);
+});
+
+function startQuiz() {
+  showPage('quiz');
+  renderQuestion();
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(function(p) {
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
+  var target = document.getElementById(id);
+  target.style.display = 'flex';
+  setTimeout(function() { target.classList.add('active'); }, 10);
+}
+
+function renderQuestion() {
+  var q = QUESTIONS[currentQ];
+  var letters = ['A','B','C','D'];
+  document.getElementById('q-num').textContent = 'Question ' + String(currentQ+1).padStart(2,'0');
+  document.getElementById('q-text').textContent = q.text;
+  document.getElementById('prog-label').textContent = (currentQ+1) + ' / ' + QUESTIONS.length;
+  document.getElementById('prog-fill').style.width = (((currentQ+1)/QUESTIONS.length)*100) + '%';
+  var optionsEl = document.getElementById('q-options');
+  optionsEl.innerHTML = '';
+  q.options.forEach(function(opt, i) {
+    var btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = '<span class="opt-letter">' + letters[i] + '</span><span>' + opt.text + '</span>';
+    btn.addEventListener('click', function() { selectOption(i, opt.scores); });
+    optionsEl.appendChild(btn);
+  });
+}
+
+function selectOption(idx, optScores) {
+  optScores.forEach(function(s, i) { scores[i] += s; });
+  document.querySelectorAll('.option-btn').forEach(function(b, i) {
+    b.classList.remove('selected');
+    if (i === idx) b.classList.add('selected');
+    b.disabled = true;
+  });
+  setTimeout(function() {
+    currentQ++;
+    if (currentQ < QUESTIONS.length) {
+      renderQuestion();
+    } else {
+      showResult();
+    }
+  }, 400);
+}
+
+function showResult() {
+  var sorted = scores.map(function(s,i){ return {i:i, s:s}; }).sort(function(a,b){ return b.s - a.s; });
+  var best = sorted[0].i;
+  var prompt = PROMPTS[best];
+  var total = Math.max.apply(null, scores) || 1;
+
+  document.getElementById('result-tagline').textContent = prompt.tagline;
+  document.getElementById('res-num').textContent = prompt.short;
+  document.getElementById('res-text').textContent = prompt.full;
+  document.getElementById('res-why').textContent = prompt.why;
+
+  var tagsEl = document.getElementById('res-tags');
+  tagsEl.innerHTML = '';
+  prompt.aok.forEach(function(tag) {
+    var t = document.createElement('span');
+    t.className = 'aok-tag';
+    t.textContent = tag;
+    tagsEl.appendChild(t);
+  });
+
+  var barsEl = document.getElementById('scores-bars');
+  barsEl.innerHTML = '';
+  sorted.forEach(function(item) {
+    var row = document.createElement('div');
+    row.className = 'score-row';
+    var pct = Math.round((item.s / total) * 100);
+    row.innerHTML = '<span class="score-label">P' + (item.i+1) + '</span><div class="score-track"><div class="score-bar" style="width:0%" data-pct="' + pct + '"></div></div><span class="score-val">' + item.s + '</span>';
+    barsEl.appendChild(row);
+  });
+
+  setTimeout(function() {
+    document.querySelectorAll('.score-bar').forEach(function(b) {
+      b.style.width = b.getAttribute('data-pct') + '%';
+    });
+  }, 200);
+
+  var runnerEl = document.getElementById('runner-list');
+  runnerEl.innerHTML = '';
+  sorted.slice(1,3).forEach(function(item) {
+    var p = PROMPTS[item.i];
+    var div = document.createElement('div');
+    div.className = 'runner-item';
+    div.innerHTML = '<span class="r-num">' + p.short.split('—')[0].trim() + '</span><span class="r-text">' + p.full.substring(0,90) + '...</span>';
+    runnerEl.appendChild(div);
+  });
+
+  showPage('result');
+}
+
+function restart() {
+  currentQ = 0;
+  scores = [0,0,0,0,0,0];
+  showPage('landing');
+}
+</script>
+</body>
+</html>
